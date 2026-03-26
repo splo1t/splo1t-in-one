@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SPLO1T
 
 `SPLO1T` is a Linux CLI framework for automating common CTF workflows and local binary/forensics/crypto analysis. It provides:
@@ -58,8 +59,8 @@ This repository version is intentionally focused on CTF-style workflows and loca
 
 ```bash
 cd ~
-git clone https://github.com/<your-username>/splo1t.git
-cd splo1t
+git clone https://github.com/splo1t/splo1t-in-one.git
+cd splo1t-in-one
 ```
 
 ### 2. Make installer executable
@@ -127,3 +128,7 @@ Then input:
 
 If you want to add more tooling, create a new module function and return `engine.CommandSpec` entries in `internal/modules/modules.go`, then wire it into the pivot logic in `internal/pivot/pivot.go`.
 
+=======
+# sploit-in-all
+"SPLO1T" is a Linux CLI framework for automating common CTF workflows and local binary/forensics/crypto analysis.
+>>>>>>> 19565daa056e030adf4e48ade768076b3e8f45fc
