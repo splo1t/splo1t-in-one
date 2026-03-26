@@ -3,6 +3,7 @@ package pivot
 import (
 	"encoding/hex"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,13 +30,18 @@ func ResolvePlan(selected string, target string) []string {
 	case "file_forensics":
 		return dedupeOrdered([]string{"forensics", "crypto"})
 	case "pwn":
-		return dedupeOrdered([]string{"pwn", "reverse", "crypto"})
+		// Shell-ish target hint.
+		return dedupeOrdered([]string{"pwn", "crypto"})
 	case "web":
-		return dedupeOrdered([]string{"web", "crypto", "misc"})
+		// If user selected web, execute web discovery only.
+		if selected == "web" {
+			return []string{"web"}
+		}
+		// Otherwise respect selection.
+		return []string{selectedToModule(selected)}
 	default:
-		// If the user picked something, run it (if supported) then fall back to flag scanning aids.
-		base := []string{selectedToModule(selected)}
-		return dedupeOrdered(append(base, []string{"crypto", "misc"}...))
+		// Unknown: run what the user selected.
+		return []string{selectedToModule(selected)}
 	}
 }
 
@@ -80,6 +86,11 @@ func classifyTarget(target string) string {
 		return "unknown"
 	}
 
+	// If it's a file path, inspect bytes and extension.
+	if fi, err := os.Stat(t); err == nil && fi.Mode().IsRegular() {
+		return classifyFile(t, fi.Size())
+	}
+
 	// Shell-ish hints.
 	low := strings.ToLower(t)
 	if strings.Contains(low, "shell") || strings.Contains(low, "www-data") || strings.Contains(low, "meterpreter") || strings.Contains(low, "session") {
@@ -91,9 +102,12 @@ func classifyTarget(target string) string {
 		return "web"
 	}
 
-	// If it's a file path, inspect bytes and extension.
-	if fi, err := os.Stat(t); err == nil && fi.Mode().IsRegular() {
-		return classifyFile(t, fi.Size())
+	// Host-ish (IP or domain).
+	if ip := net.ParseIP(t); ip != nil {
+		return "web"
+	}
+	if looksLikeDomain(t) {
+		return "web"
 	}
 
 	// Otherwise treat as text/encoded.
@@ -142,6 +156,8 @@ func classifyFile(path string, size int64) string {
 var (
 	base64Re = regexp.MustCompile(`^[A-Za-z0-9+/]+={0,2}$`)
 	hexRe    = regexp.MustCompile(`^[0-9a-fA-F]+$`)
+	// Very lightweight domain check (requires dots + a TLD).
+	domainRe = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$`)
 )
 
 func looksLikeBase64(s string) bool {
@@ -166,6 +182,14 @@ func looksLikeHex(s string) bool {
 	// Quick validity check.
 	_, err := hex.DecodeString(s[:min(128, len(s))])
 	return err == nil
+}
+
+func looksLikeDomain(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" || !strings.Contains(s, ".") {
+		return false
+	}
+	return domainRe.MatchString(s)
 }
 
 func min(a, b int) int {
