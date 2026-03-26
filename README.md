@@ -1,6 +1,6 @@
 # SPLO1T
 
-`SPLO1T` is a Kali Linux CLI framework for automating common CTF workflows and local binary/forensics/crypto analysis. It provides:
+`SPLO1T` is a Linux CLI framework for automating common CTF workflows and local binary/forensics/crypto analysis. It provides:
 
 - An interactive menu
 - Streaming output capture from external tools
