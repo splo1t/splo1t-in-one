@@ -2,7 +2,7 @@
 
 `SPLO1T` is a Kali Linux CLI framework for automating common CTF workflows and local binary/forensics/crypto analysis. It provides:
 
-- An interactive, `msfconsole`-style menu
+- An interactive menu
 - Streaming output capture from external tools
 - A regex-based flag scanner that detects and prints flags immediately
 - A pivot engine that auto-selects the best module based on the target you provide
@@ -10,7 +10,6 @@
 ## Features
 
 - Root-required startup (`sudo splo1t`)
-- Colored ASCII banner: `SPLO1T`
 - Interactive menu:
   - `[1] Web`
   - `[2] Pwn`
