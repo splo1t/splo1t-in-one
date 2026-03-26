@@ -39,14 +39,113 @@ func isLikelyURL(s string) bool {
 }
 
 func webSpecs(target string) []engine.CommandSpec {
-	if !isLikelyURL(target) {
-		// If it's not a URL, just do nothing here; in-process crypto/flag scanning may still catch patterns.
+	host := normalizeHTTPHost(target)
+	if host == "" {
 		return []engine.CommandSpec{}
 	}
-	// Fetch content; user can then match flags using regex.
-	return []engine.CommandSpec{
-		{Name: "curl_fetch", Required: false, Command: []string{"curl", "-sSL", "--max-time", "30", target}},
+
+	// Directory wordlist (best-effort). If not found, only run nmap.
+	wordlist := bestDirWordlist()
+
+	httpBase := "http://" + host
+	httpsBase := "https://" + host
+
+	cmds := []engine.CommandSpec{
+		{
+			Name:    "nmap_service_discovery",
+			Required: false,
+			Command: []string{"nmap", "-Pn", "-sV", "--reason", "-T4", host},
+		},
 	}
+
+	// Lightweight web "fetch" for banner/content scanning.
+	cmds = append(cmds,
+		engine.CommandSpec{Name: "curl_fetch_http", Required: false, Command: []string{"curl", "-sSL", "--max-time", "15", httpBase}},
+		engine.CommandSpec{Name: "curl_fetch_https", Required: false, Command: []string{"curl", "-k", "-sSL", "--max-time", "15", httpsBase}},
+	)
+
+	if wordlist != "" {
+		// ffuf
+		cmds = append(cmds,
+			engine.CommandSpec{Name: "ffuf_http", Required: false, Command: []string{"ffuf", "-u", httpBase + "/FUZZ", "-w", wordlist, "-t", "50", "-timeout", "15", "-fc", "404", "-ac"}},
+			engine.CommandSpec{Name: "ffuf_https", Required: false, Command: []string{"ffuf", "-u", httpsBase + "/FUZZ", "-w", wordlist, "-t", "50", "-timeout", "15", "-k", "-fc", "404", "-ac"}},
+		)
+
+		// gobuster
+		cmds = append(cmds,
+			engine.CommandSpec{Name: "gobuster_http", Required: false, Command: []string{"gobuster", "dir", "-u", httpBase, "-w", wordlist, "-t", "50", "-q"}},
+			engine.CommandSpec{Name: "gobuster_https", Required: false, Command: []string{"gobuster", "dir", "-u", httpsBase, "-w", wordlist, "-t", "50", "-q", "--insecure"}},
+		)
+
+		// dirsearch
+		cmds = append(cmds,
+			engine.CommandSpec{Name: "dirsearch_http", Required: false, Command: []string{"dirsearch", "-u", httpBase, "-w", wordlist, "-e", "php,html,txt,js,css", "-r", "--quiet"}},
+			engine.CommandSpec{Name: "dirsearch_https", Required: false, Command: []string{"dirsearch", "-u", httpsBase, "-w", wordlist, "-e", "php,html,txt,js,css", "-r", "--quiet", "-k"}},
+		)
+
+		// feroxbuster
+		cmds = append(cmds,
+			engine.CommandSpec{Name: "feroxbuster_http", Required: false, Command: []string{"feroxbuster", "-u", httpBase, "-w", wordlist, "-t", "50", "-q", "-e", "php,html,txt"}},
+			engine.CommandSpec{Name: "feroxbuster_https", Required: false, Command: []string{"feroxbuster", "-u", httpsBase, "-w", wordlist, "-t", "50", "-q", "-e", "php,html,txt", "--insecure"}},
+		)
+
+		// wfuzz
+		cmds = append(cmds,
+			engine.CommandSpec{Name: "wfuzz_http", Required: false, Command: []string{"wfuzz", "-c", "-z", "file," + wordlist, "-hc", "404", httpBase + "/FUZZ"}},
+			engine.CommandSpec{Name: "wfuzz_https", Required: false, Command: []string{"wfuzz", "-c", "-z", "file," + wordlist, "-hc", "404", httpsBase + "/FUZZ"}},
+		)
+	}
+
+	// Nuclei (best-effort). Requires templates; still skip gracefully if not installed.
+	cmds = append(cmds,
+		engine.CommandSpec{Name: "nuclei_http", Required: false, Command: []string{"nuclei", "-u", httpBase, "-silent"}},
+		engine.CommandSpec{Name: "nuclei_https", Required: false, Command: []string{"nuclei", "-u", httpsBase, "-silent", "-k"}},
+	)
+
+	return cmds
+}
+
+func normalizeHTTPHost(input string) string {
+	s := strings.TrimSpace(input)
+	if s == "" {
+		return ""
+	}
+	// Strip scheme if present.
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "https://")
+	// Strip path/query; keep host[:port].
+	if idx := strings.IndexAny(s, "/?"); idx >= 0 {
+		s = s[:idx]
+	}
+	// If still looks like "http://..." due to casing.
+	if isLikelyURL(s) {
+		return ""
+	}
+	// For simple cases, accept as-is.
+	if strings.Contains(s, " ") {
+		return ""
+	}
+	// Very small sanity check.
+	if len(s) < 3 {
+		return ""
+	}
+	return s
+}
+
+func bestDirWordlist() string {
+	candidates := []string{
+		"/usr/share/wordlists/raft-medium-directories.txt",
+		"/usr/share/wordlists/dirb/common.txt",
+		"/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt",
+		"/usr/share/wordlists/seclists/Discovery/Web-Content/common.txt",
+	}
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() && st.Size() > 0 {
+			return c
+		}
+	}
+	// Fallback: some systems mount smaller wordlists; leave empty if none.
+	return ""
 }
 
 func reverseSpecs(target string) []engine.CommandSpec {
