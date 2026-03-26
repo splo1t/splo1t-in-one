@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/splo1t/splo1t/internal/engine"
@@ -38,6 +39,11 @@ func main() {
 
 	target := ui.PromptLine("Enter Target:", "(IP / Domain / File / Text)")
 	flagRegex := ui.PromptLine("Enter Flag Format (regex):", "")
+	if strings.TrimSpace(flagRegex) == "" {
+		// Avoid compiling an empty regex (would match everywhere).
+		flagRegex = `flag\{[^}]+\}`
+		fmt.Printf("[i] using default flag regex: %s\n", flagRegex)
+	}
 
 	runDir, err := util.CreateRunDir()
 	if err != nil {
@@ -63,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	execEngine := engine.NewExecutor(exec.Config{
+	execEngine := engine.NewExecutor(engine.Config{
 		MaxConcurrency: 4,
 		RunDir:         runDir,
 		FlagScanner:    flagScanner,
