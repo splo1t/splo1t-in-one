@@ -45,7 +45,6 @@ func runCryptoInProcess(ctx context.Context, target string, exec *engine.Executo
 	}
 
 	if len(decoded) == 0 {
-		fmt.Println("[i] crypto: no in-process decodes available from input")
 		return
 	}
 
