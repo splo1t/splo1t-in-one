@@ -7,6 +7,7 @@ if [[ "$(id -u)" != "0" ]]; then
 fi
 
 ROOTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOTDIR"
 
 if ! command -v go >/dev/null 2>&1; then
   echo "[+] installing Go (golang-go) ..."
