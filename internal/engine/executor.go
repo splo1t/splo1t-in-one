@@ -153,11 +153,11 @@ func (e *Executor) runCommand(ctx context.Context, module string, spec CommandSp
 	go func() {
 		defer streamWg.Done()
 		// Copy in chunks; each write triggers scanner Consume().
-		_, _ = io.Copy(io.MultiWriter(stdoutLogFile, swriter), bufio.NewReader(stdout))
+		_, _ = io.Copy(io.MultiWriter(os.Stdout, stdoutLogFile, swriter), bufio.NewReader(stdout))
 	}()
 	go func() {
 		defer streamWg.Done()
-		_, _ = io.Copy(io.MultiWriter(stderrLogFile, swriter), bufio.NewReader(stderr))
+		_, _ = io.Copy(io.MultiWriter(os.Stderr, stderrLogFile, swriter), bufio.NewReader(stderr))
 	}()
 
 	streamWg.Wait()
